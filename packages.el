@@ -57,3 +57,5 @@
 ;; window-numbering
 ;; emacs MELPA里的可以直接写名字
 (package! window-numbering)
+(package! org-modern)
+(package! svg-tag-mode)

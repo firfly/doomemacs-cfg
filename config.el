@@ -1,4 +1,4 @@
-;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
+;;; $DOOMDIR.el -*- lexical-binding: t; -*-
 
 ;; Place your private configuration here! Remember, you do not need to run 'doom
 ;; sync' after modifying this file!
@@ -75,6 +75,8 @@
 ;; You can also try 'gd' (or 'C-c c d') to jump to their definition and see how
 ;; they are implemented.
 
+(set-face-attribute 'default nil :height 250)
+
 
 (setq shell-file-name (executable-find "bash"))
 (setq-default vterm-shell (executable-find "fish"))
@@ -88,7 +90,6 @@
 (setq lsp-gopls-complete-unimported t)
 (setq lsp-gopls-codelens nil)
 (use-package lsp-mode
-  :ensure t
   :commands (lsp lsp-deferred)
   :hook (go-mode . lsp-deferred))
 
@@ -101,12 +102,10 @@
 
 ;; Optional - provides fancier overlays.
 (use-package lsp-ui
-  :ensure t
   :commands lsp-ui-mode)
 
 ;; Company mode is a standard completion package that works well with lsp-mode.
 (use-package company
-  :ensure t
   :config
   ;; Optionally enable completion-as-you-type behavior.
   (setq company-idle-delay 0)
@@ -114,7 +113,6 @@
 
 ;; Optional - provides snippet support.
 (use-package yasnippet
-  :ensure t
   :commands yas-minor-mode
   :hook (go-mode . yas-minor-mode))
 
@@ -167,3 +165,156 @@
 
        )
       )
+
+(setq confirm-kill-emacs nil)
+
+(setq doom-font (font-spec :family "Input Mono Narrow" :size 14 :weight 'semi-light)
+      doom-variable-pitch-font (font-spec :family "Fira Sans") ; inherits `doom-font''s :size
+      doom-unicode-font (font-spec :family "Input Mono Narrow" :size 14)
+      doom-big-font (font-spec :family "Fira Mono" :size 19))
+
+(use-package! org-modern
+  :after org
+  :config
+  (add-hook 'org-mode-hook #'org-modern-mode))
+
+;; with org-modern
+(declare-function org-delete-all "ext:org-macs" (elts list))
+(defun doom-themes-org-config-advice! ()
+  (setq
+   org-font-lock-extra-keywords
+   (org-delete-all
+    '(("^ *\\(-----+\\)$" 1 'org-meta-line))
+    org-font-lock-extra-keywords)))
+(advice-add 'doom-themes-enable-org-fontification :after #'doom-themes-org-config-advice!)
+(doom-themes-org-config)
+
+(with-eval-after-load 'org (global-org-modern-mode))
+
+(modify-all-frames-parameters
+ '((right-divider-width . 40)
+   (internal-border-width . 40)))
+(dolist (face '(window-divider
+                window-divider-first-pixel
+                window-divider-last-pixel))
+  (face-spec-reset-face face)
+  (set-face-foreground face (face-attribute 'default :background)))
+(set-face-background 'fringe (face-attribute 'default :background))
+
+(setq
+ ;; Edit settings
+ org-auto-align-tags nil
+ org-tags-column 0
+ org-catch-invisible-edits 'show-and-error
+ org-special-ctrl-a/e t
+ org-insert-heading-respect-content t
+
+ ;; Org styling, hide markup etc.
+ org-hide-emphasis-markers t
+ org-pretty-entities t
+
+ ;; Agenda styling
+ org-agenda-tags-column 0
+ org-agenda-block-separator ?─
+ org-agenda-time-grid
+ '((daily today require-timed)
+   (800 1000 1200 1400 1600 1800 2000)
+   " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄")
+ org-agenda-current-time-string
+ "◀── now ─────────────────────────────────────────────────")
+
+;; Ellipsis styling
+(require 'org-faces)
+(setq org-ellipsis "…")
+(set-face-attribute 'org-ellipsis nil :inherit 'default :box nil)
+
+(global-org-modern-mode)
+
+
+
+(require 'svg-tag-mode)
+
+(defconst date-re "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}")
+(defconst time-re "[0-9]\\{2\\}:[0-9]\\{2\\}")
+(defconst day-re "[A-Za-z]\\{3\\}")
+(defconst day-time-re (format "\\(%s\\)? ?\\(%s\\)?" day-re time-re))
+
+(defun svg-progress-percent (value)
+  (save-match-data
+    (svg-image (svg-lib-concat
+                (svg-lib-progress-bar  (/ (string-to-number value) 100.0)
+                                       nil :margin 0 :stroke 2 :radius 3 :padding 2 :width 11)
+                (svg-lib-tag (concat value "%")
+                             nil :stroke 0 :margin 0)) :ascent 'center)))
+
+(defun svg-progress-count (value)
+  (save-match-data
+    (let* ((seq (split-string value "/"))
+           (count (if (stringp (car seq))
+                      (float (string-to-number (car seq)))
+                    0))
+           (total (if (stringp (cadr seq))
+                      (float (string-to-number (cadr seq)))
+                    1000)))
+      (svg-image (svg-lib-concat
+                  (svg-lib-progress-bar (/ count total) nil
+                                        :margin 0 :stroke 2 :radius 3 :padding 2 :width 11)
+                  (svg-lib-tag value nil
+                               :stroke 0 :margin 0)) :ascent 'center))))
+
+(setq svg-tag-tags
+      `(
+        ;; Org tags
+        (":\\([A-Za-z0-9]+\\)" . ((lambda (tag) (svg-tag-make tag))))
+        (":\\([A-Za-z0-9]+[ \-]\\)" . ((lambda (tag) tag)))
+
+        ;; Task priority
+        ("\\[#[A-Z]\\]" . ( (lambda (tag)
+                              (svg-tag-make tag :face 'org-priority
+                                            :beg 2 :end -1 :margin 0))))
+
+        ;; TODO / DONE
+        ("TODO" . ((lambda (tag) (svg-tag-make "TODO" :face 'org-todo :inverse t :margin 0))))
+        ("DONE" . ((lambda (tag) (svg-tag-make "DONE" :face 'org-done :margin 0))))
+
+
+        ;; Citation of the form [cite:@Knuth:1984]
+        ("\\(\\[cite:@[A-Za-z]+:\\)" . ((lambda (tag)
+                                          (svg-tag-make tag
+                                                        :inverse t
+                                                        :beg 7 :end -1
+                                                        :crop-right t))))
+        ("\\[cite:@[A-Za-z]+:\\([0-9]+\\]\\)" . ((lambda (tag)
+                                                   (svg-tag-make tag
+                                                                 :end -1
+                                                                 :crop-left t))))
+
+
+        ;; Active date (with or without day name, with or without time)
+        (,(format "\\(<%s>\\)" date-re) .
+         ((lambda (tag)
+            (svg-tag-make tag :beg 1 :end -1 :margin 0))))
+        (,(format "\\(<%s \\)%s>" date-re day-time-re) .
+         ((lambda (tag)
+            (svg-tag-make tag :beg 1 :inverse nil :crop-right t :margin 0))))
+        (,(format "<%s \\(%s>\\)" date-re day-time-re) .
+         ((lambda (tag)
+            (svg-tag-make tag :end -1 :inverse t :crop-left t :margin 0))))
+
+        ;; Inactive date  (with or without day name, with or without time)
+        (,(format "\\(\\[%s\\]\\)" date-re) .
+         ((lambda (tag)
+            (svg-tag-make tag :beg 1 :end -1 :margin 0 :face 'org-date))))
+        (,(format "\\(\\[%s \\)%s\\]" date-re day-time-re) .
+         ((lambda (tag)
+            (svg-tag-make tag :beg 1 :inverse nil :crop-right t :margin 0 :face 'org-date))))
+        (,(format "\\[%s \\(%s\\]\\)" date-re day-time-re) .
+         ((lambda (tag)
+            (svg-tag-make tag :end -1 :inverse t :crop-left t :margin 0 :face 'org-date))))
+
+        ;; ;; Progress
+        ("\\(\\[[0-9]\\{1,3\\}%\\]\\)" . ((lambda (tag)
+                                            (svg-progress-percent (substring tag 1 -2)))))
+        ("\\(\\[[0-9]+/[0-9]+\\]\\)" . ((lambda (tag)
+                                          (svg-progress-count (substring tag 1 -1)))))
+        ))
